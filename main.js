@@ -22,6 +22,8 @@ async function connectToDatabase() {
 
 connectToDatabase();
 
+
+
 const store = new MongoDBStore({
   uri: MongoURI,
   collection: "session"
@@ -35,8 +37,8 @@ app.use(session({
   saveUninitialized: false,
   store: store
 }))
-const isAuth = (req,res,next) =>{
-  if(req.session.isAuth){
+const isAuth = (req, res, next) => {
+  if (req.session.isAuth) {
     next()
   }
   else {
@@ -69,37 +71,50 @@ app.post("/login", async (req, res) => {
   res.redirect("/dashboard");
 });
 
-app.get("/register",(req,res)=>{
+app.get("/register", (req, res) => {
   res.render("register")
-  
+
 })
-app.post("/register", async (req,res)=>{
-  const{name,email,password} = req.body;  
-  let user = await UserModel.findOne({email})
+app.post("/register", async (req, res) => {
+  const { u_name, email, password } = req.body;
 
-const hashpswrd = await bcrypt.hash(password, 12)
+  try {
+    let user = await UserModel.findOne({ email });
 
-  if(user){
-     return res.redirect('/register')
+    if (user) {
+      // User already exists with the provided email
+      return res.redirect('/register');
+    }
+
+    const hashPassword = await bcrypt.hash(password, 12);
+
+    user = new UserModel({
+      u_name,
+      email,
+      password: hashPassword
+    });
+
+    await user.save();
+    res.redirect("/login");
+  } catch (error) {
+    if (error.code === 11000 && error.keyPattern && error.keyValue && error.keyValue.name) {
+      // Duplicate key error on the 'name' field
+      return res.status(400).send("Username already exists. Please choose a different username.");
+    }
+
+    // Handle other errors
+    console.error(error);
+    res.status(500).send("Internal Server Error");
   }
-  user = new UserModel({
-    name, 
-    email,
-    password: hashpswrd
-  })
-  await user.save()
-  res.redirect("/login")
-})
+});
 
-
-
-app.get("/dashboard",isAuth,(req,res)=>{
+app.get("/dashboard", isAuth, (req, res) => {
   res.render("dashboard")
 })
 
-app.post("/logout",(req,res)=>{
-  req.session.destroy((err)=>{
-    if(err) throw err;
+app.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) throw err;
     res.redirect("/")
   })
 })
